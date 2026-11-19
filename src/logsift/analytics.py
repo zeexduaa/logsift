@@ -117,8 +117,12 @@ def pick_interval(span: float, target: int = 60) -> int:
     return INTERVALS[-1]
 
 
-def histogram(store: Store, q: Query, *, target: int = 60) -> Histogram | None:
+def histogram(store: Store, q: Query, *, target: int = 60, now: float | None = None) -> Histogram | None:
+    """Counts per time bucket. "since:1h" with no end runs up to `now`, so a quiet stretch at the end (the errors
+    stopped, or the service stopped logging) shows as empty bars instead of being cut off."""
     lo, hi = q.since, q.until
+    if lo is not None and hi is None and now is not None and now > lo:
+        hi = now
     if lo is None or hi is None:
         row = store.db.execute(f"SELECT MIN(ts), MAX(ts) FROM events WHERE {q.where}", q.params).fetchone()
         if row[0] is None:

@@ -213,7 +213,7 @@ def run(args: argparse.Namespace, store: Store, clock: Clock, out: Output) -> in
         for name in list(LEVELS) + ["none"]:
             if s.levels.get(name):
                 print(f"  {out.paint(name.ljust(6), COLORS.get(name, ''))}{s.levels[name]:>10,}")
-        h = analytics.histogram(store, q, target=30)
+        h = analytics.histogram(store, q, target=30, now=clock.now)
         if h and h.peak:
             print(f"\nEvents per {_interval(h.interval)}:")
             quiet = 0

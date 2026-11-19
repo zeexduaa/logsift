@@ -63,3 +63,17 @@ def test_context_skips_over_stack_traces(store, clock):
     hit = analytics.search(store, q(clock, '"charge failed"'))[0]
     around = analytics.context(store, hit, 1)
     assert [h.message.split("\n")[0] for h in around] == ["connected to postgres", "charge failed for order 1182", "cart 77 has 0 items"]
+
+
+def test_histogram_for_a_recent_window_runs_up_to_now(clock):
+    """'Errors in the last hour' must show the last half hour being quiet, not stop at the last error."""
+    from logsift.parsers import Event
+    s = Store()
+    src = s.add_source("x", "json")
+    s.insert(src, [Event("a", ts=clock.now - 3000, level=4), Event("b", ts=clock.now - 1800, level=4)])
+    h = analytics.histogram(s, q(clock, "since:1h"), now=clock.now)
+    assert h.buckets[-1][0] + h.interval >= clock.now
+    assert sum(e for _, e, _, _ in h.buckets) == 2
+    assert all(e == 0 for start, e, _, _ in h.buckets if start > clock.now - 1700)  # the quiet end is there, and empty
+    whole = analytics.histogram(s, q(clock), now=clock.now)  # no window asked for: just the span of the data
+    assert whole.buckets[-1][0] <= clock.now - 1800

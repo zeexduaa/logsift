@@ -190,7 +190,7 @@ class App:
         return self.page(q or "Search", body, q=q, rng=rng)
 
     def histogram(self, compiled: Query, q: str) -> str:
-        h = analytics.histogram(self.store, compiled, target=80)
+        h = analytics.histogram(self.store, compiled, target=80, now=self.clock.now)
         if not h or not h.peak:
             return ""
         n = len(h.buckets)
