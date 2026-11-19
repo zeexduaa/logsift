@@ -199,3 +199,30 @@ def test_limit_must_be_a_positive_number(run, capsys, value):
     with pytest.raises(SystemExit) as exit_:
         run("search", "-n", value)
     assert exit_.value.code == 2
+
+
+def test_dashboard_links_keep_the_meaning_of_an_or_search(app):
+    """Clicking a pattern, a top value or a timeline bar narrows the search; with OR in it, that needs brackets."""
+    import html
+    from urllib.parse import parse_qs, urlsplit
+    from logsift.web import narrow
+    assert narrow("timeout OR declined", "service:api") == "(timeout OR declined) service:api"
+    assert narrow("level:error timeout", "service:api") == "level:error timeout service:api"
+    assert narrow("", "service:api") == "service:api"
+    _, body = page(app, "/?q=timeout%20OR%20declined")
+    links = [html.unescape(h) for h in re.findall(r"href='(/\?q=[^']+)'", body)]
+    assert links
+    for href in links:
+        q = parse_qs(urlsplit(href).query)["q"][0]
+        status, followed = page(app, href)
+        assert status == 200, (q, followed[:300])
+        if q.startswith("pattern:"):
+            continue  # an event's "same pattern" link starts a new search on purpose
+        assert q.startswith("(timeout OR declined)"), q
+    bar = next(h for h in links if "since:" in parse_qs(urlsplit(h).query)["q"][0])
+    q = parse_qs(urlsplit(bar).query)["q"][0]
+    assert q.count("since:") == 1  # zooming twice replaces the window instead of stacking them
+    _, again = page(app, bar)
+    svg = again[again.index("<svg class='hist'"):again.index("</svg>")]
+    deeper = html.unescape(re.findall(r"<a href='([^']+)'", svg)[0])  # a bar on the zoomed-in timeline
+    assert parse_qs(urlsplit(deeper).query)["q"][0].count("since:") == 1

@@ -13,9 +13,27 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 from . import __version__, analytics
-from .query import Query, QueryError, compile_query
+from .query import Group, Parser, Query, QueryError, compile_query, tokenize
 from .store import Store
 from .timeparse import LEVELS, Clock, TimeError, iso
+
+TIME_TERM = re.compile(r'\s*\b(?:since|until|after|before):(?:"[^"]*"|\S+)')
+
+
+def narrow(q: str, term: str) -> str:
+    """The search q, restricted further by term. "a OR b" + "service:x" must become "(a OR b) service:x", not
+    "a OR b service:x", which means "a OR (b AND service:x)"."""
+    q = q.strip()
+    if not q:
+        return term
+    try:
+        tree = Parser(tokenize(q)).parse()
+    except QueryError:
+        return f"{q} {term}"
+    if isinstance(tree, Group) and tree.op == "or":
+        q = f"({q})"
+    return f"{q} {term}"
+
 
 NEEDS_QUOTES = re.compile(r'[\s,"]')
 RANGES = (("15m", "15 min"), ("1h", "1 hour"), ("24h", "24 hours"), ("7d", "7 days"), ("30d", "30 days"), ("", "All time"))
@@ -212,7 +230,7 @@ class App:
                     rects.append(f"<rect class='{cls}' x='{x + bar * .08:.1f}' y='{y:.1f}' width='{bar * .84:.1f}' height='{h_px:.1f}'/>")
             since = datetime.fromtimestamp(start, self.clock.zone).strftime("%Y-%m-%dT%H:%M:%S")
             until = datetime.fromtimestamp(start + h.interval, self.clock.zone).strftime("%Y-%m-%dT%H:%M:%S")
-            href = self.link(q=re.sub(r"\s*\b(since|until):\S+", "", q).strip() + f" since:{since} until:{until}")
+            href = self.link(q=narrow(TIME_TERM.sub("", q).strip(), f"since:{since} until:{until}"))
             parts.append(f"<a href='{e(href)}'><title>{e(title)}</title>{''.join(rects)}</a>")
         first = iso(h.buckets[0][0], self.clock.zone)[:16]
         last = iso(h.buckets[-1][0], self.clock.zone)[:16]
@@ -257,12 +275,12 @@ class App:
             out = []
             for value, n in rows:
                 term = f"{key}:{json.dumps(value) if NEEDS_QUOTES.search(value) else value}"
-                href = self.link(q=f"{q} {term}".strip(), range=rng)
+                href = self.link(q=narrow(q, term), range=rng)
                 out.append(f"<tr><td><a href='{e(href)}'>{e(value)}</a></td><td class='n'>{n:,}</td></tr>")
             return "<table class='top'>" + "".join(out) + "</table>"
         patterns = analytics.patterns(self.store, compiled, limit=8)
         pattern_rows = "".join(
-            f"<tr><td><a class='pattern' href='{e(self.link(q=(q + ' ' if q else '') + 'pattern:' + json.dumps(p.template), range=rng))}'>"
+            f"<tr><td><a class='pattern' href='{e(self.link(q=narrow(q, 'pattern:' + json.dumps(p.template)), range=rng))}'>"
             f"<span class='lv {e(p.level_name if p.level is not None else 'none')}'>{e(p.level_name.upper())}</span> {e(p.template)}</a></td>"
             f"<td class='n'>{p.count:,}</td></tr>" for p in patterns)
         parts = [f"<div class='card'><h2>Patterns</h2><table class='top'>{pattern_rows}</table></div>" if patterns else "",
