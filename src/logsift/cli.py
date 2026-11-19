@@ -38,6 +38,17 @@ def use_color(stream) -> bool:
     return True
 
 
+def positive(text: str) -> int:
+    """-n must be a count of at least 1 (SQLite reads a negative LIMIT as "no limit at all")."""
+    try:
+        n = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} isn't a number") from None
+    if n < 1:
+        raise argparse.ArgumentTypeError("must be 1 or more")
+    return n
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="logsift", description="Search and make sense of log files.",
                                 epilog="Quote searches that contain > < or spaces: logsift search 'status>=500 since:1h'")
@@ -56,7 +67,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("search", help="show matching events, newest last")
     query_args(s)
-    s.add_argument("-n", "--limit", type=int, default=50, help="how many events (default 50)")
+    s.add_argument("-n", "--limit", type=positive, default=50, help="how many events (default 50)")
     s.add_argument("--json", action="store_true", help="one JSON object per line, for jq and scripts")
     s.add_argument("--csv", action="store_true", help="CSV for a spreadsheet")
     s.add_argument("--full", action="store_true", help="show every line of multi-line events (stack traces)")
@@ -68,10 +79,10 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("top", help="the most common values of a field, e.g. top status 'level>=warn'")
     s.add_argument("field")
     query_args(s)
-    s.add_argument("-n", "--limit", type=int, default=10)
+    s.add_argument("-n", "--limit", type=positive, default=10)
     s = sub.add_parser("patterns", help="group matching messages by shape: the distinct things happening")
     query_args(s)
-    s.add_argument("-n", "--limit", type=int, default=20)
+    s.add_argument("-n", "--limit", type=positive, default=20)
     sub.add_parser("sources", help="list the files in the index")
     s = sub.add_parser("forget", help="remove a file and its events from the index")
     s.add_argument("path")

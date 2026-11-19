@@ -192,3 +192,10 @@ def test_csv_export_is_safe_to_open_in_a_spreadsheet(run, tmp_path):
     run("ingest", str(log))
     row = run("search", "--csv")[1].splitlines()[1]
     assert ",'@SUM(1+1)," in row and ",\"'=HYPERLINK(" in row
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "lots"])
+def test_limit_must_be_a_positive_number(run, capsys, value):
+    with pytest.raises(SystemExit) as exit_:
+        run("search", "-n", value)
+    assert exit_.value.code == 2
