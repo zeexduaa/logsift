@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.10", "3.13"]
+        exclude:
+          # GitHub's macOS machines are scarce and these jobs often wait until they're cancelled; the oldest Python is
+          # covered on Linux and Windows.
+          - os: macos-latest
+            python: "3.10"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -e . pytest
+      - run: python -m pytest -q
+      - name: The installed command works on generated logs
+        shell: bash
+        env:
+          LOGSIFT_DB: ${{ runner.temp }}/ci-index.db
+        run: |
+          python scripts/demo_logs.py "$RUNNER_TEMP/demo-logs" --scale 0.5
+          logsift ingest "$RUNNER_TEMP/demo-logs"
+          logsift ingest "$RUNNER_TEMP/demo-logs" | grep -q "no new lines"
+          test "$(logsift count 'level>=error')" -gt 0
+          logsift patterns 'level>=error' -n 3
+          logsift search 'status>=500' -n 2
