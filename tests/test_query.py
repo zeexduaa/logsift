@@ -56,7 +56,24 @@ def count(store, clock, text):
     ('msg:"order 1182"', 1),
     ("10.0.4.17", 1),
     ("NEAR(timeout", 0),                     # FTS syntax typed by a person is just text
-    ('AND OR NOT "*"', 0),
+    ('and or not "*"', 0),                   # lower-case and/or/not are ordinary words
+    # OR, NOT and brackets
+    ("status:502 OR status:403", 2),
+    ("(status:502 OR status:403) level:error", 1),
+    ('timeout OR "timed out"', 3),
+    ("service:api OR service:worker", 5),
+    ("(timeout OR declined) level:error", 3),
+    ("level:error AND timeout", 2),
+    ("NOT (level:info OR level:warn)", 10),  # the 8 errors and the 2 events with no level
+    ("-(level:info OR level:warn)", 10),
+    ("NOT timeout NOT declined level:error", 5),
+    ("((timeout))", 2),
+    ("timeout OR (status>=500 OR host:db-1)", 4),
+    ('"(110: Connection timed out)"', 1),    # brackets inside quotes are just text
+    ("timeout or declined", 0),              # three words that must all appear
+    ("source:syslog OR source:access", 8),   # not merged into one list: source matches part of a path
+    ("level:error OR level:warn", 12),       # merged into level:error,warn
+    ('msg:"slow query" OR msg:declined', 2),
 ])
 def test_searches(store, clock, text, expected):
     assert count(store, clock, text) == expected
@@ -70,6 +87,15 @@ def test_searches(store, clock, text, expected):
     ("since:soon", "isn't a time"),
     ("-since:1h", "since:<time>"),
     ("level>=warn,error", "one level"),
+    ("timeout OR", "both sides"),
+    ("OR timeout", "both sides"),
+    ("timeout AND", "both sides"),
+    ("(timeout", "never closed"),
+    ("timeout)", "without a matching"),
+    ("()", "empty brackets"),
+    ("NOT", "after it"),
+    ("since:1h OR timeout", "time window"),
+    ("NOT since:1h", "time window"),
 ])
 def test_helpful_errors(clock, text, message):
     with pytest.raises(QueryError, match=message):
@@ -110,3 +136,12 @@ def test_search_order_and_paging(store, clock):
 
 def test_words_for_highlighting(clock):
     assert compile_query('timeout "connection refused" -noise status:500 retr*', clock).words == ["timeout", "connection refused", "retr"]
+    words = compile_query("timeout NOT (noise OR spam) (declined OR refused)", clock).words
+    assert set(words) == {"timeout", "declined", "refused"}  # nothing from inside the NOT
+
+
+def test_parenthesised_word_without_spaces(store, clock):
+    """A function call in a message, like price_cart(item), is a word, not a group."""
+    from logsift.query import tokenize
+    assert [t.value for t in tokenize("price_cart(item)")] == ["price_cart(item)"]
+    assert tokenize("(status:502 OR status:504)")[0] == "(" and tokenize("(status:502 OR status:504)")[-1] == ")"
