@@ -148,7 +148,7 @@ def parse_access(line: str, clock: Clock) -> Event | None:
         # it as "-" or escaped bytes with a 400. Still a request, with a time and a status, worth seeing.
         g["protocol"] = None
         fields = {"ip": g["ip"], "request": g["request"], "status": status}
-        message = f"invalid request {g['request'][:80]!r} {status}" if g["request"] not in ("", "-") else f"empty request {status}"
+        message = f'invalid request "{g["request"][:80]}" {status}' if g["request"] not in ("", "-") else f"empty request {status}"
     if g["bytes"] != "-":
         fields["bytes"] = int(g["bytes"])
     for key in ("user", "protocol", "referer", "agent"):

@@ -102,6 +102,6 @@ def test_access_log_bad_requests(clock):
     assert empty.ts is not None and empty.level == WARN and empty.message == "empty request 400"
     garbage = parse_access('198.51.100.8 - - [19/Nov/2026:07:50:03 +0000] "\\x16\\x03\\x01\\x02\\x00" 400 157 "-" "-"', clock)
     assert garbage.fields["status"] == 400 and garbage.fields["request"] == "\\x16\\x03\\x01\\x02\\x00"
-    assert garbage.message.startswith("invalid request")
+    assert garbage.message == 'invalid request "\\x16\\x03\\x01\\x02\\x00" 400'  # as nginx wrote it, not doubled
     ipv6 = parse_access('2001:db8::1 - - [19/Nov/2026:07:50:04 +0000] "GET /api?q=a%20b HTTP/2.0" 502 10 "-" "x"', clock)
     assert ipv6.fields["ip"] == "2001:db8::1" and ipv6.fields["path"] == "/api?q=a%20b" and ipv6.level == ERROR
