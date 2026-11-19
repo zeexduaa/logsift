@@ -183,3 +183,12 @@ def test_escape_codes_in_logs_are_not_sent_to_the_terminal(run, tmp_path):
         out = run(*args)[1]
         assert "\x1b" not in out and "\x07" not in out, args
     assert "\\x1b]0;pwned\\x07\\x1b[2Jadmin" in run("search", "login")[1]
+
+
+def test_csv_export_is_safe_to_open_in_a_spreadsheet(run, tmp_path):
+    log = tmp_path / "evil.jsonl"
+    log.write_text('{"time":"2026-11-19T07:50:03Z","level":"info","msg":"=HYPERLINK(\\"http://evil.test\\",\\"click\\")",'
+                   '"service":"@SUM(1+1)"}\n', encoding="utf-8")
+    run("ingest", str(log))
+    row = run("search", "--csv")[1].splitlines()[1]
+    assert ",'@SUM(1+1)," in row and ",\"'=HYPERLINK(" in row

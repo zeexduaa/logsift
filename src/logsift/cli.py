@@ -102,6 +102,12 @@ def safe(text: str) -> str:
     return CONTROL.sub(lambda m: f"\\x{ord(m.group(0)):02x}", text).replace("\t", "    ")
 
 
+def cell(text: str) -> str:
+    """Spreadsheets run a cell that starts with = + - @ as a formula. Log text is often chosen by an attacker, so such
+    cells get a leading ' and open as plain text."""
+    return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
+
+
 def event_line(hit: analytics.Hit, out: Output, zone, full: bool) -> str:
     level = hit.level_name
     who = safe(hit.service or "")
@@ -200,8 +206,8 @@ def run(args: argparse.Namespace, store: Store, clock: Clock, out: Output) -> in
             writer = csv.writer(sys.stdout, lineterminator="\n")
             writer.writerow(["time", "level", "service", "host", "message", "source", "line"])
             for hit in hits:
-                writer.writerow([iso(hit.ts, zone), hit.level_name, hit.service or "", hit.host or "",
-                                 hit.message, hit.source, hit.line])
+                writer.writerow([iso(hit.ts, zone), hit.level_name, cell(hit.service or ""), cell(hit.host or ""),
+                                 cell(hit.message), cell(hit.source), hit.line])
             return 0
         if not hits:
             print("No events match." if store.count() else "The index is empty. Start with: logsift ingest <files>")
