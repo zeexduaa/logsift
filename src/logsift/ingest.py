@@ -173,13 +173,30 @@ def ingest_file(store: Store, path: Path, clock: Clock, *, fmt: str | None = Non
 
 
 def ingest(store: Store, paths: Iterable[str], clock: Clock, *, fmt: str | None = None,
-           report: Callable[[Result], None] | None = None) -> list[Result]:
+           report: Callable[[Result], None] | None = None,
+           problem: Callable[[str, str], None] | None = None) -> list[Result]:
+    """Ingest every file the paths name. A path or file that can't be read is reported through `problem(path, reason)`
+    and skipped, so one bad file in a folder doesn't stop the rest; without `problem` the first one raises."""
     results = []
-    for path in expand(paths):
-        result = ingest_file(store, path, clock, fmt=fmt)
-        results.append(result)
-        if report:
-            report(result)
+    for raw in paths:
+        try:
+            files = expand([raw])
+        except IngestError as err:
+            if problem is None:
+                raise
+            problem(raw, str(err))
+            continue
+        for path in files:
+            try:
+                result = ingest_file(store, path, clock, fmt=fmt)
+            except (IngestError, OSError) as err:
+                if problem is None:
+                    raise
+                problem(str(path), str(err))
+                continue
+            results.append(result)
+            if report:
+                report(result)
     return results
 
 

@@ -161,3 +161,12 @@ def test_real_server(tmp_path, clock):
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_one_bad_file_does_not_stop_the_rest(run, tmp_path):
+    bad = tmp_path / "a-image.log"
+    bad.write_bytes(b"\x89PNG\x00\x00binary")
+    code, out, err = run("ingest", str(bad), str(tmp_path / "missing.log"), str(FIXTURES))
+    assert code == 1                                   # scripts still learn something went wrong
+    assert "Added 21 events from 5 files" in out       # but everything readable was read
+    assert "skipped" in err and "binary" in err and "missing.log" in err

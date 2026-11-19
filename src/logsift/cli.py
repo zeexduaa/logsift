@@ -113,10 +113,19 @@ def run(args: argparse.Namespace, store: Store, clock: Clock, out: Output) -> in
             show_result(results[-1])
         else:
             print("Reading:")
-            results = ingest(store, args.paths, clock, fmt=args.format, report=show_result)
+            skipped: list[str] = []
+
+            def problem(path: str, reason: str) -> None:
+                skipped.append(path)
+                print(f"  skipped {path}: {reason.removeprefix(path + ' ')}", file=sys.stderr)
+
+            results = ingest(store, args.paths, clock, fmt=args.format, report=show_result, problem=problem)
         added = sum(r.added for r in results)
         print(f"Added {added:,} events from {len(results)} file{'s' if len(results) != 1 else ''} in {time.time() - started:.1f}s. "
               f"The index has {store.count():,}.")
+        if args.paths != ["-"] and skipped:
+            print(f"{len(skipped)} could not be read (see above).", file=sys.stderr)
+            return 1  # so a script or scheduled task notices
         return 0
     if cmd == "refresh":
         results = refresh(store, clock, report=show_result)
