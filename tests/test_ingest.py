@@ -146,3 +146,14 @@ def test_forget_and_prune(store, clock):
     removed = store.prune(clock.now - 1800)  # older than 07:30 UTC: only the +05:00 line, at 02:50 UTC
     assert removed == 1
     assert store.forget("/not/there") == 0
+
+
+def test_byte_order_mark_is_ignored(store, clock, tmp_path):
+    """Notepad and many Windows tools start UTF-8 files with a BOM; the first event must still be read properly."""
+    log = tmp_path / "bom.jsonl"
+    log.write_bytes('﻿{"time":"2026-11-19T07:50:01Z","level":"error","msg":"first"}\n'
+                    '{"time":"2026-11-19T07:50:02Z","level":"info","msg":"second"}\n'.encode("utf-8"))
+    settle(log)
+    assert ingest_file(store, log, clock).format == "json"
+    first = store.db.execute("SELECT message, level, ts FROM events ORDER BY line").fetchone()
+    assert first["message"] == "first" and first["level"] == 4 and first["ts"] is not None

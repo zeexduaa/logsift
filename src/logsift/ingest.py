@@ -95,11 +95,16 @@ def _open(path: Path, offset: int) -> io.BufferedReader:
 def _lines(f: io.BufferedReader, offset: int, settled: bool) -> Iterator[tuple[str, int]]:
     """Complete lines with the offset just after each. A last line with no newline is held back while the file is
     still being written (it may be half a line), and taken once the file has settled."""
+    first = offset == 0
     for chunk in f:
         if not chunk.endswith(b"\n") and not settled:
             return
         offset += len(chunk)
-        yield chunk.decode("utf-8", "replace"), offset
+        text = chunk.decode("utf-8", "replace")
+        if first:
+            text = text.removeprefix("\ufeff")  # the byte-order mark Notepad and other Windows tools put at the start
+            first = False
+        yield text, offset
 
 
 def ingest_file(store: Store, path: Path, clock: Clock, *, fmt: str | None = None) -> Result:
@@ -138,7 +143,7 @@ def ingest_file(store: Store, path: Path, clock: Clock, *, fmt: str | None = Non
             src.format = fmt
         elif src.offset == 0:
             with _open(path, 0) as f:
-                sample = [line.decode("utf-8", "replace") for _, line in zip(range(200), f)]
+                sample = [line.decode("utf-8", "replace").removeprefix("\ufeff") for _, line in zip(range(200), f)]
             src.format = detect_format(sample, clock)
         before = src.events
         settled = time.time() - stat.st_mtime > SETTLED or path.suffix == ".gz"
@@ -194,7 +199,7 @@ def refresh(store: Store, clock: Clock, report: Callable[[Result], None] | None 
 
 def ingest_stream(store: Store, stream: io.TextIOBase, clock: Clock, name: str = "<stdin>", fmt: str | None = None) -> Result:
     """Logs piped in (`kubectl logs pod | logsift ingest -`). Each run adds what it receives."""
-    lines = stream.read().splitlines()
+    lines = stream.read().removeprefix("\ufeff").splitlines()
     with store.db:
         src = store.source(name) or store.add_source(name, fmt or "text")
         src.format = fmt or detect_format(lines[:200], clock)
