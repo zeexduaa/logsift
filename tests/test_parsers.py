@@ -105,3 +105,12 @@ def test_access_log_bad_requests(clock):
     assert garbage.message == 'invalid request "\\x16\\x03\\x01\\x02\\x00" 400'  # as nginx wrote it, not doubled
     ipv6 = parse_access('2001:db8::1 - - [19/Nov/2026:07:50:04 +0000] "GET /api?q=a%20b HTTP/2.0" 502 10 "-" "x"', clock)
     assert ipv6.fields["ip"] == "2001:db8::1" and ipv6.fields["path"] == "/api?q=a%20b" and ipv6.level == ERROR
+
+
+def test_syslog_with_rfc3339_time(clock):
+    """rsyslog on current Debian/Ubuntu writes full timestamps instead of "Nov 19 07:50:01"."""
+    line = "2026-11-19T07:50:01.123456+00:00 web-1 sshd[1201]: Failed password for root from 203.0.113.5 port 4242 ssh2"
+    ev = parse_syslog(line, clock)
+    assert (ev.host, ev.service, ev.fields) == ("web-1", "sshd", {"pid": 1201})
+    assert ev.message.startswith("Failed password") and ev.ts == 1795074601.123456
+    assert detect_format([line] * 3, clock) == "syslog"

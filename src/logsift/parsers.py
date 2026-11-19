@@ -164,7 +164,9 @@ def parse_access(line: str, clock: Clock) -> Event | None:
 
 # -- syslog (RFC 3164 and 5424) ------------------------------------------------------------------------
 
-SYSLOG_3164 = re.compile(r"(?:<(?P<pri>\d{1,3})>)?(?P<time>[A-Z][a-z]{2}\s+\d{1,2} \d{2}:\d{2}:\d{2}) (?P<host>\S+) "
+# The classic "Nov 19 07:50:01", or the RFC 3339 time that rsyslog writes on current Debian and Ubuntu.
+SYSLOG_3164 = re.compile(r"(?:<(?P<pri>\d{1,3})>)?(?P<time>[A-Z][a-z]{2}\s+\d{1,2} \d{2}:\d{2}:\d{2}|"
+                         r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})) (?P<host>\S+) "
                          r"(?P<app>[^\s:\[]+)(?:\[(?P<pid>\d+)\])?: ?(?P<msg>.*)$")
 SYSLOG_5424 = re.compile(r"<(?P<pri>\d{1,3})>1 (?P<time>\S+) (?P<host>\S+) (?P<app>\S+) (?P<pid>\S+) (?P<msgid>\S+) "
                          r"(?P<sd>-|(?:\[.*?\])+) ?(?P<msg>.*)$")
