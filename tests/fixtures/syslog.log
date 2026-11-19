@@ -1,0 +1,4 @@
+Nov 19 07:50:01 web-1 sshd[1201]: Accepted publickey for deploy from 198.51.100.7 port 51122
+Nov 19 07:50:09 web-1 kernel: Out of memory: Killed process 4412 (python3)
+<11>Nov 19 07:51:30 web-2 nginx[88]: upstream timed out (110: Connection timed out)
+<165>1 2026-11-19T07:52:00.003Z db-1 postgres 7731 - - checkpoint complete: wrote 3412 buffers

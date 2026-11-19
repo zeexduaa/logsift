@@ -1,0 +1,8 @@
+{"time":"2026-11-19T07:50:01.120Z","level":"info","msg":"server started","service":"api","port":8080}
+{"time":"2026-11-19T07:50:03.004Z","level":"warn","msg":"slow query","service":"api","duration_ms":1840,"db":{"table":"orders"}}
+{"time":"2026-11-19T07:50:04.500Z","level":"error","msg":"Timeout after 3012ms talking to 10.0.4.17:5432","service":"api","request_id":"a3f9c2e81b7d"}
+{"time":"2026-11-19T07:50:05.020Z","level":50,"msg":"Timeout after 2988ms talking to 10.0.4.9:5432","service":"worker","request_id":"b81c00e4d2aa"}
+Traceback (most recent call last):
+  File "worker.py", line 42, in run
+TimeoutError: database did not answer
+{"time":1795074606000,"level":"INFO","message":"job done","service":"worker","job":{"id":991,"kind":"invoice"}}

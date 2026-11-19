@@ -1,0 +1,9 @@
+2026-11-19 07:50:01,234 - app.db - INFO - connected to postgres
+2026-11-19 07:50:02,001 - app.payments - ERROR - charge failed for order 1182
+Traceback (most recent call last):
+  File "/srv/app/payments.py", line 88, in charge
+    resp = gateway.charge(order)
+ConnectionError: gateway unreachable
+2026-11-19 07:50:03,410 [worker-3] WARN com.shop.Cart - cart 77 has 0 items
+2026-11-19T07:50:04.100+05:00 ERROR main: disk at 93% on /dev/sda1
+ERROR:app.mail:could not send receipt to customer@example.test
