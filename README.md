@@ -67,9 +67,12 @@ path:/api/*   user:alice     any field; * is a wildcard; nested fields with dots
 source:nginx                 the file it came from (part of the path)
 since:1h   until:2026-11-19  a time window: 15m, 2h, 7d, today, yesterday, a date or 2026-11-19T07:50
 pattern:"Timeout after <num>ms talking to <ip>"   one group from `logsift patterns`
+a OR b   (a OR b) c          either one; brackets group; terms side by side must all match
+NOT (level:info OR health)   leave out everything in the brackets (-(...) works too)
 ```
 
-All terms must match. In a terminal, put the search in quotes so the shell doesn't treat `>` as a redirect:
+Terms side by side must all match. `OR`, `AND` and `NOT` are operators only in capitals, so "or" in a message is still
+just a word. For example: `(status:502 OR status:504) service:api NOT healthcheck since:1h`. In a terminal, put the search in quotes so the shell doesn't treat `>` as a redirect:
 `logsift search 'status>=500 since:1h'`.
 
 ## Commands

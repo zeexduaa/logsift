@@ -7,7 +7,6 @@ values from the command line and a local dashboard. These are the next steps, ro
 
 - [ ] **Live tail**: `logsift tail QUERY` follows files as they're written and prints matching lines, and the dashboard
       gets a live mode.
-- [ ] **OR and grouping** in searches: `(status:502 OR status:504) service:api`.
 - [ ] **Alerts**: `logsift watch 'level>=error' --more-than 20 --per 5m --run "notify-send ..."`, so a scheduled task
       can warn you before users do.
 - [ ] **Compare two periods**: which patterns are new or growing since yesterday. Usually the fastest way to find what a
@@ -31,3 +30,4 @@ values from the command line and a local dashboard. These are the next steps, ro
 - [x] Query language with fields, numbers, wildcards, nested fields, time windows and negation
 - [x] Patterns, timeline, top values, context
 - [x] Command line and read-only local dashboard
+- [x] OR, NOT and brackets in searches (0.2)

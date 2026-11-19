@@ -317,7 +317,8 @@ HELP = """<div class='card help small'><h2>Search tips</h2>
 <p><code>timeout</code> words · <code>"connection refused"</code> phrase · <code>-healthcheck</code> leave out</p>
 <p><code>level>=warn</code> · <code>service:api,worker</code> · <code>host:web-1</code></p>
 <p><code>status>=500</code> · <code>path:/api/*</code> · <code>db.table:orders</code></p>
-<p><code>since:2h</code> · <code>until:2026-11-19</code> · <code>source:nginx</code></p></div>"""
+<p><code>since:2h</code> · <code>until:2026-11-19</code> · <code>source:nginx</code></p>
+<p><code>(status:502 OR status:504)</code> · <code>NOT (level:info OR health)</code></p></div>"""
 
 
 class Handler(BaseHTTPRequestHandler):

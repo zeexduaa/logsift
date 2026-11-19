@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0 — unreleased
+
+- **OR, NOT and brackets in searches**: `(status:502 OR status:504) service:api NOT (healthcheck OR level:debug)`.
+  `-( ... )` works as NOT. Operators are only recognised in capitals, so "or" in a message is still a word, and a word
+  like `price_cart(item)` isn't mistaken for a group. Mistakes ("OR with nothing after it", an unclosed bracket, since:
+  inside OR) get a message saying what to change.
+- Searching a field for several values is faster: the value is read once (`IN (...)`) instead of once per comparison,
+  and `status:502 OR status:504` is looked up like `status:502,504`. On 90,000 events this took one such search from
+  0.66 s to 0.16 s.
+
 ## 0.1.0 — unreleased
 
 The first version.
