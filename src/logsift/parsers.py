@@ -127,8 +127,9 @@ def _number(value: str):
 # -- web server access logs (common / combined) ----------------------------------------------------------
 
 ACCESS = re.compile(
-    r'(?P<ip>\S+) \S+ (?P<user>\S+) \[(?P<time>[^\]]+)\] "(?P<method>[A-Z]+) (?P<path>\S+)(?: (?P<protocol>[^"]+))?" '
+    r'(?P<ip>\S+) \S+ (?P<user>\S+) \[(?P<time>[^\]]+)\] "(?P<request>(?:[^"\\]|\\.)*)" '
     r'(?P<status>\d{3}) (?P<bytes>\d+|-)(?: "(?P<referer>[^"]*)" "(?P<agent>[^"]*)")?(?: (?P<rest>.*))?$')
+REQUEST = re.compile(r"(?P<method>[A-Z]+) (?P<path>\S+)(?: (?P<protocol>\S+))?$")
 
 
 def parse_access(line: str, clock: Clock) -> Event | None:
@@ -137,7 +138,17 @@ def parse_access(line: str, clock: Clock) -> Event | None:
         return None
     g = m.groupdict()
     status = int(g["status"])
-    fields: dict = {"ip": g["ip"], "method": g["method"], "path": g["path"], "status": status}
+    request = REQUEST.match(g["request"])
+    if request:
+        g.update(request.groupdict())
+        fields: dict = {"ip": g["ip"], "method": g["method"], "path": g["path"], "status": status}
+        message = f"{g['method']} {g['path']} {status}"
+    else:
+        # Scanners and broken clients send garbage (a TLS handshake to a plain-HTTP port) or nothing at all; nginx logs
+        # it as "-" or escaped bytes with a 400. Still a request, with a time and a status, worth seeing.
+        g["protocol"] = None
+        fields = {"ip": g["ip"], "request": g["request"], "status": status}
+        message = f"invalid request {g['request'][:80]!r} {status}" if g["request"] not in ("", "-") else f"empty request {status}"
     if g["bytes"] != "-":
         fields["bytes"] = int(g["bytes"])
     for key in ("user", "protocol", "referer", "agent"):
@@ -147,7 +158,7 @@ def parse_access(line: str, clock: Clock) -> Event | None:
     if re.fullmatch(r"\d+(\.\d+)?", rest):  # nginx $request_time or Apache %D at the end
         fields["duration"] = _number(rest)
     level = level_rank("error" if status >= 500 else "warn" if status >= 400 else "info")
-    return Event(message=f"{g['method']} {g['path']} {status}", ts=parse_timestamp(g["time"], clock) if g["time"] else None,
+    return Event(message=message, ts=parse_timestamp(g["time"], clock) if g["time"] else None,
                  level=level, fields=fields, raw=line)
 
 
