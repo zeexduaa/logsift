@@ -16,3 +16,11 @@ The first version.
 - Command line (`ingest`, `refresh`, `search`, `count`, `stats`, `top`, `patterns`, `sources`, `forget`, `prune`,
   `serve`) and a read-only local dashboard.
 - `scripts/demo_logs.py` writes realistic demo logs to try it on.
+
+### Fixed before release
+
+- The first line of a file saved with a byte-order mark (Notepad, many Windows tools) wasn't recognised.
+- nginx/Apache lines for empty or garbage requests (`"-" 400`, scanners) lost their time, status and level.
+- UTF-16 files (PowerShell 5's `> out.log`) were refused as binary.
+- One unreadable file stopped `logsift ingest`, so later files were never read; now it's skipped and reported.
+- "Last hour" timelines stopped at the last event instead of running to now.
