@@ -10,6 +10,16 @@
   and `status:502 OR status:504` is looked up like `status:502,504`. On 90,000 events this took one such search from
   0.66 s to 0.16 s.
 
+### Fixed
+
+- **Security:** escape codes inside log messages (which an attacker can plant through a request) were sent to the
+  terminal by `search`, `patterns` and `top`, where they could clear the screen, retitle the window or hide lines.
+  They're now shown as `\x1b`.
+- **Security:** `search --csv` cells starting with `=`, `+`, `-` or `@` ran as formulas in Excel and LibreOffice.
+- syslog lines with RFC 3339 timestamps (rsyslog on current Debian and Ubuntu) were read as plain text.
+- Clicking a pattern, a top value or a timeline bar on an OR search changed its meaning, or showed an error.
+- `-n -1` printed every event, and `-n 0` said nothing matched.
+
 ## 0.1.0 — unreleased
 
 The first version.
