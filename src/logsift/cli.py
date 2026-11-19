@@ -6,6 +6,7 @@ import argparse
 import csv
 import json
 import os
+import re
 import sys
 import time
 import webbrowser
@@ -92,12 +93,22 @@ def show_result(r: Result) -> None:
         print(f"  {r.path}: {r.added:,} events as {r.format}{note}")
 
 
+CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
+
+
+def safe(text: str) -> str:
+    """Log lines often carry text an attacker chose (a user agent, a URL, a username). Escape codes in it would be run
+    by the terminal: clearing the screen, retitling the window, hiding lines. Show them as \\x1b instead."""
+    return CONTROL.sub(lambda m: f"\\x{ord(m.group(0)):02x}", text).replace("\t", "    ")
+
+
 def event_line(hit: analytics.Hit, out: Output, zone, full: bool) -> str:
     level = hit.level_name
-    who = hit.service or ""
+    who = safe(hit.service or "")
     if hit.host:
-        who = f"{hit.host}/{who}" if who else hit.host
+        who = f"{safe(hit.host)}/{who}" if who else safe(hit.host)
     message = hit.message if full else hit.message.split("\n", 1)[0] + (" …" if "\n" in hit.message else "")
+    message = safe(message)
     head = f"{out.paint(iso(hit.ts, zone), '2')} {out.paint(level.upper().ljust(5), COLORS.get(level, ''))}"
     return f"{head} {out.paint(who, '35') + ' ' if who else ''}{message}"
 
@@ -238,14 +249,14 @@ def run(args: argparse.Namespace, store: Store, clock: Clock, out: Output) -> in
             print(f"No matching events have a {args.field!r} field.")
         width = max((len(v) for v, _ in rows), default=0)
         for value, n in rows:
-            print(f"  {value.ljust(min(width, 60))[:60]}  {n:>8,}")
+            print(f"  {safe(value).ljust(min(width, 60))[:60]}  {n:>8,}")
         return 0
     if cmd == "patterns":
         rows = analytics.patterns(store, q, limit=args.limit)
         for p in rows:
             level = out.paint(p.level_name.upper().ljust(5), COLORS.get(p.level_name, ""))
-            print(f"{p.count:>8,}  {level}  {p.template}")
-            print(out.paint(f"{'':17}e.g. {p.example[:120]}", "2"))
+            print(f"{p.count:>8,}  {level}  {safe(p.template)}")
+            print(out.paint(f"{'':17}e.g. {safe(p.example[:120])}", "2"))
         if not rows:
             print("No events match.")
         return 0

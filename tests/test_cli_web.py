@@ -170,3 +170,16 @@ def test_one_bad_file_does_not_stop_the_rest(run, tmp_path):
     assert code == 1                                   # scripts still learn something went wrong
     assert "Added 21 events from 5 files" in out       # but everything readable was read
     assert "skipped" in err and "binary" in err and "missing.log" in err
+
+
+def test_escape_codes_in_logs_are_not_sent_to_the_terminal(run, tmp_path):
+    """A log message can contain terminal escape codes put there by whoever sent the request. Printing them raw lets
+    them clear the screen, retitle the window or hide lines; they must show up as harmless text."""
+    log = tmp_path / "evil.jsonl"
+    log.write_text('{"time":"2026-11-19T07:50:02Z","level":"warn","msg":"login failed for \\u001b]0;pwned\\u0007\\u001b[2Jadmin",'
+                   '"user":"\\u001b[8mhidden"}\n', encoding="utf-8")
+    run("ingest", str(log))
+    for args in (("search", "login"), ("search", "login", "--full"), ("patterns",), ("top", "user")):
+        out = run(*args)[1]
+        assert "\x1b" not in out and "\x07" not in out, args
+    assert "\\x1b]0;pwned\\x07\\x1b[2Jadmin" in run("search", "login")[1]
