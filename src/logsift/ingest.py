@@ -107,6 +107,34 @@ def _lines(f: io.BufferedReader, offset: int, settled: bool) -> Iterator[tuple[s
         yield text, offset
 
 
+def _encoding(path: Path) -> str:
+    """UTF-16 if the file says so with a byte-order mark (PowerShell 5's "> file" writes that), otherwise UTF-8."""
+    if path.suffix == ".gz":
+        return "utf-8"
+    with open(path, "rb") as f:
+        start = f.read(2)
+    return {b"\xff\xfe": "utf-16-le", b"\xfe\xff": "utf-16-be"}.get(start, "utf-8")
+
+
+def _utf16_lines(path: Path, offset: int, codec: str, settled: bool) -> Iterator[tuple[str, int]]:
+    """Like _lines, for UTF-16: offsets stay in bytes, so reading can resume exactly where it stopped."""
+    with open(path, "rb") as f:
+        f.seek(offset)
+        data = f.read()
+    if offset == 0:
+        data, offset = data[2:], 2  # the byte-order mark
+    data = data[:len(data) - len(data) % 2]  # half a character at the end is still being written
+    text = data.decode(codec, "replace")
+    pieces = text.split("\n")
+    for i, piece in enumerate(pieces):
+        last = i == len(pieces) - 1
+        if last and (not piece or not settled):
+            return  # nothing after the final newline, or a line still being written
+        line = piece if last else piece + "\n"
+        offset += len(line.encode(codec))
+        yield line, offset
+
+
 def ingest_file(store: Store, path: Path, clock: Clock, *, fmt: str | None = None) -> Result:
     if fmt is not None and fmt not in FORMATS:
         raise IngestError(f"unknown format {fmt!r}; choose from {', '.join(FORMATS)}")
@@ -117,7 +145,8 @@ def ingest_file(store: Store, path: Path, clock: Clock, *, fmt: str | None = Non
             sample = f.read(4096)
     except (OSError, EOFError) as err:  # includes a ".gz" that isn't really gzip
         raise IngestError(f"can't read {path}: {err}") from None
-    if _is_binary(sample):
+    codec = _encoding(path)
+    if codec == "utf-8" and _is_binary(sample):
         raise IngestError(f"{path} looks like a binary file, not a log")
     src = store.source(key)
     status = "appended"
@@ -142,8 +171,11 @@ def ingest_file(store: Store, path: Path, clock: Clock, *, fmt: str | None = Non
         if fmt:
             src.format = fmt
         elif src.offset == 0:
-            with _open(path, 0) as f:
-                sample = [line.decode("utf-8", "replace").removeprefix("\ufeff") for _, line in zip(range(200), f)]
+            if codec == "utf-8":
+                with _open(path, 0) as f:
+                    sample = [line.decode("utf-8", "replace").removeprefix("\ufeff") for _, line in zip(range(200), f)]
+            else:
+                sample = [line for (line, _), _ in zip(_utf16_lines(path, 0, codec, True), range(200))]
             src.format = detect_format(sample, clock)
         before = src.events
         settled = time.time() - stat.st_mtime > SETTLED or path.suffix == ".gz"
@@ -152,7 +184,8 @@ def ingest_file(store: Store, path: Path, clock: Clock, *, fmt: str | None = Non
         number = src.line
         offset = src.offset
         with _open(path, src.offset) as f:
-            for text, offset in _lines(f, src.offset, settled):
+            lines = _lines(f, src.offset, settled) if codec == "utf-8" else _utf16_lines(path, src.offset, codec, settled)
+            for text, offset in lines:
                 number += 1
                 event = parser.feed(text, number)
                 if event:

@@ -157,3 +157,21 @@ def test_byte_order_mark_is_ignored(store, clock, tmp_path):
     assert ingest_file(store, log, clock).format == "json"
     first = store.db.execute("SELECT message, level, ts FROM events ORDER BY line").fetchone()
     assert first["message"] == "first" and first["level"] == 4 and first["ts"] is not None
+
+
+@pytest.mark.parametrize("codec", ["utf-16", "utf-16-be"])
+def test_utf16_files(store, clock, tmp_path, codec):
+    """Windows PowerShell 5's `program > out.log` writes UTF-16. It used to be refused as a binary file."""
+    log = tmp_path / "ps.log"
+    bom = "﻿" if codec == "utf-16-be" else ""
+    log.write_bytes((bom + "2026-11-19 07:50:01 ERROR app - disk full ünïcode\r\n2026-11-19 07:50:02 INFO app - retry ok\r\n").encode(codec))
+    settle(log)
+    result = ingest_file(store, log, clock)
+    assert (result.format, result.added) == ("text", 2)
+    assert store.db.execute("SELECT message FROM events ORDER BY line").fetchone()[0] == "disk full ünïcode"
+    with open(log, "ab") as f:
+        f.write("2026-11-19 07:50:03 WARN app - more\r\n".encode("utf-16-le" if codec == "utf-16" else codec))
+    settle(log)
+    result = ingest_file(store, log, clock)
+    assert (result.status, result.added) == ("appended", 1)  # carries on from the right byte
+    assert store.db.execute("SELECT message FROM events ORDER BY line DESC").fetchone()[0] == "more"
